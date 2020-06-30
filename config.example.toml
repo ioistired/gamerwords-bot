@@ -1,0 +1,11 @@
+# a list of strings. @mentions are always supported
+prefix = []
+
+[tokens]
+discord = 'Mz...'
+
+[tokens.stats]
+# supported keys:
+# discord.bots.pw
+# discord.boats
+# discordbots.org
