@@ -61,8 +61,7 @@ import unidecode
 import random
 
 #GAMER_REGEX = r'(?:[^s]|^)(n+\s*i+\s*g\s*g+\s*(?:e+\s*r+|(a)))(\s*s+)?'
-# match "bro" or "bruh" with any repeated characters and spacing in between each letter
-GAMER_REGEX = r'b+\s*r+\s*(?:u+\s*h+|o+)'
+GAMER_REGEX = r'(b+\s*r+\s*u+\s*h+)'
 
 with open('data/catchphrases.txt') as f:
 	CATCHPHRASES = list(map(str.rstrip, f))
