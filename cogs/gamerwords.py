@@ -155,6 +155,9 @@ class GamerWords(commands.Cog):
 				continue
 
 			for member in guild.members:
+				if member.top_role > guild.me.top_role:
+					continue
+
 				match = self.has_gamer_words(member.display_name)
 				if match:
 					new_content = self.censor_gamers(member.display_name)
