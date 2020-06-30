@@ -146,7 +146,7 @@ class GamerWords(commands.Cog):
 
 	def censor_gamers(self, string):
 		string = unidecode.unidecode(string)
-		return re.sub(GAMER_REGEX, random.choice(CATCHPHRASES), string, flags=re.IGNORECASE)
+		return re.sub(GAMER_REGEX, lambda _: random.choice(CATCHPHRASES), string, flags=re.IGNORECASE)
 
 	async def clear_usernames(self):
 		await self.bot.wait_until_ready()
