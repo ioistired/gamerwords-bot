@@ -1,5 +1,4 @@
-# Copyright 2020 io mintz <io@mintz.cc>
-# Copyright 2020 Vex
+# Copyright 2020 io mintz <io@mintz.cc>, StarrFox, Vex
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of
 # this software and associated documentation files (the "Software"),
@@ -52,19 +51,143 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 # THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import random
 import collections
 import re
+import asyncio
+from string import ascii_letters
+
 import discord
 from discord.ext import commands
-import asyncio
 import unidecode
-import random
 
-#GAMER_REGEX = r'(?:[^s]|^)(n+\s*i+\s*g\s*g+\s*(?:e+\s*r+|(a)))(\s*s+)?'
+from utils import gather_or_cancel
+
 GAMER_REGEX = r'(b+\s*r+\s*u+\s*h+)'
 
 with open('data/catchphrases.txt') as f:
 	CATCHPHRASES = list(map(str.rstrip, f))
+
+class GamerReplacer:
+	GAMER_WORD_PARTS = frozenset('ruh')
+
+	def __init__(self, text):
+		self.start_index = -1
+		self.letter_check = [False] * 4
+		self.match_length = 0
+		self.spaces = 0
+		self.closed = False
+		self.text = text
+
+	def reset(self):
+		self.start_index = -1
+		self.letter_check = [False] * 4
+		self.match_length = 0
+		self.spaces = 0
+
+	def replace(self):
+		if self.closed:
+			raise RuntimeError('This replacer is closed')
+
+		matches = []
+		total_length = len(self.text)
+
+		for index, char in enumerate(self.text):
+			is_last_char = index + 1 == total_length
+			decoded = unidecode.unidecode(char)
+
+			# b is an end check
+			if decoded.lower() in self.GAMER_WORD_PARTS:
+				self.spaces = 0
+
+			if decoded.lower() == 'b':
+				if self.start_index == -1:
+					self.start_index = index
+
+				if self.start_index != -1 and sum(self.letter_check) == 4:
+					if self.spaces:
+						self.match_length -= self.spaces
+
+					matches.append(self.text[self.start_index:self.start_index + self.match_length])
+					self.match_length = len(char)
+					self.letter_check = [True, False, False, False]
+					self.start_index = index
+					self.spaces = 0
+
+				else:
+					self.match_length += len(char)
+					self.letter_check[0] = True
+					self.spaces = 0
+
+			elif decoded.lower() == 'r':
+				self.match_length += len(char)
+				self.letter_check[1] = True
+
+			elif decoded.lower() == 'u':
+				self.match_length += len(char)
+				self.letter_check[2] = True
+
+			elif decoded.lower() == 'h':
+				self.match_length += len(char)
+				self.letter_check[3] = True
+
+			else:
+				if self.start_index != -1 and sum(self.letter_check) == 4:
+					if self.spaces:
+						self.match_length -= self.spaces
+
+					matches.append(self.text[self.start_index:self.start_index + self.match_length])
+					self.reset()
+
+				else:
+					if decoded in ascii_letters:
+						self.reset()
+
+					else:
+						if char.isspace():
+							self.spaces += 1
+						else:
+							self.spaces = 0
+
+						if self.start_index != -1:
+							self.match_length += len(char)
+
+			if self.start_index != -1 and sum(self.letter_check) == 4 and is_last_char:
+				matches.append(self.text[self.start_index:self.start_index + self.match_length])
+
+		match_indexes = []
+		unsearched = self.text
+		used = 0
+		for match in sorted(matches, key=lambda l: len(l), reverse=True):
+			start = unsearched.find(match) + used
+			end = start + len(match)
+			match_indexes.append((start, end))
+			used += len(unsearched[:end])
+			unsearched = unsearched[end:]
+
+		seperated = [*self.text]
+		last = 0
+		last_replaced_len = 0
+		for start, end in match_indexes:
+			if start > last:
+				start += last_replaced_len
+
+			replacement = random.choice(CATCHPHRASES)
+			seperated[start:end] = replacement
+
+			replaced_len = len(replacement)
+			if replaced_len > end - start:
+				last_replaced_len = replaced_len - end
+
+			else:
+				last_replaced_len = end - replaced_len
+
+			last = start
+
+		self.closed = True
+
+		return ''.join(seperated)
+
 
 class GamerWords(commands.Cog):
 	def __init__(self, bot):
@@ -111,20 +234,45 @@ class GamerWords(commands.Cog):
 
 	@commands.Cog.listener()
 	async def on_message(self, message):
-		if message.author.bot:
+		if self.skip_if(message):
 			return
 		await self.handle_new_gamer_message(message)
 
 	@commands.Cog.listener()
 	async def on_message_edit(self, old_message, new_message):
-		if old_message.author.bot:
+		if self.skip_if(old_message):
 			return
 		await self.handle_new_gamer_message(new_message)
 
+	@staticmethod
+	def skip_if(message):
+		return message.author.bot or not message.guild
+
 	async def handle_new_gamer_message(self, message):
-		match = self.has_gamer_words(message.content)
-		if match:
+		text_match = self.has_gamer_words(message.content)
+		file_match = any(self.has_gamer_words(attachment.filename) for attachment in message.attachments)
+		if text_match or file_match:
+			for attach in message.attachments:
+				if attach.size >= getattr(message.guild, 'filesize_limit', 8 * 1024 ** 2):
+					await message.delete(delay=0.2)
+					return
+
+			async def dl_attach(attach):
+				file = await attach.to_file()
+				if self.has_gamer_words(file.filename):
+					file.filename = GamerReplacer(file.filename).replace()
+
+				return file
+
 			try:
+				# download all attachments in parallel
+				files = await gather_or_cancel(*map(dl_attach, message.attachments))
+			except Break:
+				return
+
+			try:
+				# can't use delete(delay=) because we need to return on exceptions
+				await asyncio.sleep(0.2)
 				await message.delete()
 			except discord.HTTPException:
 				return
@@ -137,16 +285,19 @@ class GamerWords(commands.Cog):
 				return
 
 			author = message.author
-			new_content = self.censor_gamers(message.content)
+
+			if message.channel.permissions_for(author).mention_everyone:
+				allowed_mentions = discord.AllowedMentions(everyone=True, roles=True)
+			else:
+				allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
+
 			await webhook.send(
-				content=new_content,
+				content=GamerReplacer(message.content).replace(),
 				username=author.display_name,
 				avatar_url=str(author.avatar_url),
+				files=files,
+				allowed_mentions=allowed_mentions
 			)
-
-	def censor_gamers(self, string):
-		string = unidecode.unidecode(string)
-		return re.sub(GAMER_REGEX, lambda _: random.choice(CATCHPHRASES), string, flags=re.IGNORECASE)
 
 	async def clear_usernames(self):
 		await self.bot.wait_until_ready()
@@ -160,8 +311,12 @@ class GamerWords(commands.Cog):
 
 				match = self.has_gamer_words(member.display_name)
 				if match:
-					new_content = self.censor_gamers(member.display_name)
-					await member.edit(nick=new_content)
+					new_content = GamerReplacer(member.display_name).replace()
+					try:
+						await member.edit(nick=new_content)
+					except discord.Forbidden:
+						# while iterating, we were denied Manage Nicknames
+						continue
 
 	@commands.Cog.listener()
 	async def on_member_update(self, old_member, new_member):
@@ -169,10 +324,13 @@ class GamerWords(commands.Cog):
 			return
 		if old_member.top_role > old_member.guild.me.top_role:
 			return
+		guild = old_member.guild
+		if not guild.permissions_for(guild.me).manage_nicknames:
+			return
 
 		match = self.has_gamer_words(new_member.display_name)
 		if match:
-			new_content = self.censor_gamers(new_member.display_name)
+			new_content = GamerReplacer(new_member.display_name).replace()
 			await new_member.edit(nick=new_content)
 
 def setup(bot):
