@@ -161,15 +161,16 @@ class GamerReplacer:
 		for match in sorted(matches, key=lambda l: len(l), reverse=True):
 			start_pos = unsearched.find(match)
 			end_pos = start_pos + len(match) - 1
+			length = len(match)
 			start = start_pos + used
 			end = end_pos + used
-			match_indexes.append((start, end))
+			match_indexes.append((length, start, end))
 			used += len(unsearched[:end_pos + 1])
 			unsearched = unsearched[end_pos + 1:]
 
 		seperated = [*self.text]
 		offset = 0
-		for start, end in match_indexes:
+		for length, start, end in match_indexes:
 			start += offset
 			end += offset
 
@@ -177,7 +178,7 @@ class GamerReplacer:
 			seperated[start:end + 1] = replacement
 
 			replaced_len = len(replacement)
-			offset += replaced_len - 4
+			offset += replaced_len - length
 
 		self.closed = True
 
