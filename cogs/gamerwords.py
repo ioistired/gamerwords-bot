@@ -159,30 +159,25 @@ class GamerReplacer:
 		unsearched = self.text
 		used = 0
 		for match in sorted(matches, key=lambda l: len(l), reverse=True):
-			start = unsearched.find(match) + used
-			end = start + len(match)
+			start_pos = unsearched.find(match)
+			end_pos = start_pos + len(match) - 1
+			start = start_pos + used
+			end = end_pos + used
 			match_indexes.append((start, end))
-			used += len(unsearched[:end])
-			unsearched = unsearched[end:]
+			used += len(unsearched[:end_pos + 1])
+			unsearched = unsearched[end_pos + 1:]
 
 		seperated = [*self.text]
-		last = 0
-		last_replaced_len = 0
+		offset = 0
 		for start, end in match_indexes:
-			if start > last:
-				start += last_replaced_len
+			start += offset
+			end += offset
 
 			replacement = random.choice(CATCHPHRASES)
-			seperated[start:end] = replacement
+			seperated[start:end + 1] = replacement
 
 			replaced_len = len(replacement)
-			if replaced_len > end - start:
-				last_replaced_len = replaced_len - end
-
-			else:
-				last_replaced_len = end - replaced_len
-
-			last = start
+			offset += replaced_len - 4
 
 		self.closed = True
 
@@ -264,11 +259,8 @@ class GamerWords(commands.Cog):
 
 				return file
 
-			try:
-				# download all attachments in parallel
-				files = await gather_or_cancel(*map(dl_attach, message.attachments))
-			except Break:
-				return
+			# download all attachments in parallel
+			files = await gather_or_cancel(*map(dl_attach, message.attachments))
 
 			try:
 				# can't use delete(delay=) because we need to return on exceptions
@@ -325,7 +317,7 @@ class GamerWords(commands.Cog):
 		if old_member.top_role > old_member.guild.me.top_role:
 			return
 		guild = old_member.guild
-		if not guild.permissions_for(guild.me).manage_nicknames:
+		if not guild.me.guild_permissions.manage_nicknames:
 			return
 
 		match = self.has_gamer_words(new_member.display_name)
