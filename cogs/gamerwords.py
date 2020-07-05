@@ -89,7 +89,7 @@ class GamerReplacer:
 		if self.closed:
 			raise RuntimeError('This replacer is closed')
 
-		matches = []
+		indexes = []
 		total_length = len(self.text)
 
 		for index, char in enumerate(self.text):
@@ -108,7 +108,11 @@ class GamerReplacer:
 					if self.spaces:
 						self.match_length -= self.spaces
 
-					matches.append(self.text[self.start_index:self.start_index + self.match_length])
+					indexes.append((
+						self.match_length,
+						self.start_index,
+						self.start_index + self.match_length
+					))
 					self.match_length = len(char)
 					self.letter_check = [True, False, False, False]
 					self.start_index = index
@@ -136,7 +140,11 @@ class GamerReplacer:
 					if self.spaces:
 						self.match_length -= self.spaces
 
-					matches.append(self.text[self.start_index:self.start_index + self.match_length])
+					indexes.append((
+						self.match_length,
+						self.start_index,
+						self.start_index + self.match_length
+					))
 					self.reset()
 
 				else:
@@ -153,26 +161,19 @@ class GamerReplacer:
 							self.match_length += len(char)
 
 			if self.start_index != -1 and sum(self.letter_check) == 4 and is_last_char:
-				matches.append(self.text[self.start_index:self.start_index + self.match_length])
+				indexes.append((
+					self.match_length,
+					self.start_index,
+					self.start_index + self.match_length
+				))
 
-		match_indexes = []
-		unsearched = self.text
-		used = 0
-		for match in sorted(matches, key=lambda l: len(l), reverse=True):
-			start_pos = unsearched.find(match)
-			end_pos = start_pos + len(match) - 1
-			length = len(match)
-			start = start_pos + used
-			end = end_pos + used
-			match_indexes.append((length, start, end))
-			used += len(unsearched[:end_pos + 1])
-			unsearched = unsearched[end_pos + 1:]
+		indexes = sorted(indexes, key=lambda l: l[1])
 
-		seperated = [*self.text]
+		seperated = list(self.text)
 		offset = 0
-		for length, start, end in match_indexes:
+		for length, start, end in indexes:
 			start += offset
-			end += offset
+			end += offset - 1
 
 			replacement = random.choice(CATCHPHRASES)
 			seperated[start:end + 1] = replacement
