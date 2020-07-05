@@ -89,7 +89,7 @@ class GamerReplacer:
 		if self.closed:
 			raise RuntimeError('This replacer is closed')
 
-		matches = []
+		indexes = []
 		total_length = len(self.text)
 
 		for index, char in enumerate(self.text):
@@ -108,7 +108,11 @@ class GamerReplacer:
 					if self.spaces:
 						self.match_length -= self.spaces
 
-					matches.append(self.text[self.start_index:self.start_index + self.match_length])
+					indexes.append((
+						self.match_length,
+						self.start_index,
+						self.start_index + self.match_length
+					))
 					self.match_length = len(char)
 					self.letter_check = [True, False, False, False]
 					self.start_index = index
@@ -136,7 +140,11 @@ class GamerReplacer:
 					if self.spaces:
 						self.match_length -= self.spaces
 
-					matches.append(self.text[self.start_index:self.start_index + self.match_length])
+					indexes.append((
+						self.match_length,
+						self.start_index,
+						self.start_index + self.match_length
+					))
 					self.reset()
 
 				else:
@@ -153,36 +161,25 @@ class GamerReplacer:
 							self.match_length += len(char)
 
 			if self.start_index != -1 and sum(self.letter_check) == 4 and is_last_char:
-				matches.append(self.text[self.start_index:self.start_index + self.match_length])
+				indexes.append((
+					self.match_length,
+					self.start_index,
+					self.start_index + self.match_length
+				))
 
-		match_indexes = []
-		unsearched = self.text
-		used = 0
-		for match in sorted(matches, key=lambda l: len(l), reverse=True):
-			start = unsearched.find(match) + used
-			end = start + len(match)
-			match_indexes.append((start, end))
-			used += len(unsearched[:end])
-			unsearched = unsearched[end:]
+		indexes = sorted(indexes, key=lambda l: l[1])
 
-		seperated = [*self.text]
-		last = 0
-		last_replaced_len = 0
-		for start, end in match_indexes:
-			if start > last:
-				start += last_replaced_len
+		seperated = list(self.text)
+		offset = 0
+		for length, start, end in indexes:
+			start += offset
+			end += offset - 1
 
 			replacement = random.choice(CATCHPHRASES)
-			seperated[start:end] = replacement
+			seperated[start:end + 1] = replacement
 
 			replaced_len = len(replacement)
-			if replaced_len > end - start:
-				last_replaced_len = replaced_len - end
-
-			else:
-				last_replaced_len = end - replaced_len
-
-			last = start
+			offset += replaced_len - length
 
 		self.closed = True
 
@@ -264,11 +261,8 @@ class GamerWords(commands.Cog):
 
 				return file
 
-			try:
-				# download all attachments in parallel
-				files = await gather_or_cancel(*map(dl_attach, message.attachments))
-			except Break:
-				return
+			# download all attachments in parallel
+			files = await gather_or_cancel(*map(dl_attach, message.attachments))
 
 			try:
 				# can't use delete(delay=) because we need to return on exceptions
@@ -325,7 +319,7 @@ class GamerWords(commands.Cog):
 		if old_member.top_role > old_member.guild.me.top_role:
 			return
 		guild = old_member.guild
-		if not guild.permissions_for(guild.me).manage_nicknames:
+		if not guild.me.guild_permissions.manage_nicknames:
 			return
 
 		match = self.has_gamer_words(new_member.display_name)
