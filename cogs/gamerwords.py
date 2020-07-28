@@ -68,20 +68,19 @@ GAMER_REGEX = r'(b+\s*r+\s*u+\s*h+)'
 with open('data/catchphrases.txt') as f:
 	CATCHPHRASES = list(map(str.rstrip, f))
 
+ASCII_LETTERS = frozenset(ascii_letters)
+
 class GamerReplacer:
-	GAMER_WORD_PARTS = frozenset('ruh')
+	GAMER_WORD = 'bruh'
 
 	def __init__(self, text):
-		self.start_index = -1
-		self.letter_check = [False] * 4
-		self.match_length = 0
-		self.spaces = 0
 		self.closed = False
 		self.text = text
+		self.reset()
 
 	def reset(self):
 		self.start_index = -1
-		self.letter_check = [False] * 4
+		self.letters_found = 0
 		self.match_length = 0
 		self.spaces = 0
 
@@ -95,16 +94,18 @@ class GamerReplacer:
 		for index, char in enumerate(self.text):
 			is_last_char = index + 1 == total_length
 			decoded = unidecode.unidecode(char)
+			decoded_lower = decoded.lower()
+			idx = self.GAMER_WORD.find(decoded_lower)
 
 			# b is an end check
-			if decoded.lower() in self.GAMER_WORD_PARTS:
+			if idx > 0:
 				self.spaces = 0
 
-			if decoded.lower() == 'b':
+			if idx == 0:
 				if self.start_index == -1:
 					self.start_index = index
 
-				if self.start_index != -1 and sum(self.letter_check) == 4:
+				if self.start_index != -1 and self.letters_found == 4:
 					if self.spaces:
 						self.match_length -= self.spaces
 
@@ -113,30 +114,22 @@ class GamerReplacer:
 						self.start_index,
 						self.start_index + self.match_length
 					))
-					self.match_length = len(char)
-					self.letter_check = [True, False, False, False]
+					self.match_length = 1
+					self.letters_found = 1
 					self.start_index = index
 					self.spaces = 0
 
 				else:
-					self.match_length += len(char)
-					self.letter_check[0] = True
+					self.match_length += 1
+					self.letters_found += 1
 					self.spaces = 0
 
-			elif decoded.lower() == 'r':
-				self.match_length += len(char)
-				self.letter_check[1] = True
-
-			elif decoded.lower() == 'u':
-				self.match_length += len(char)
-				self.letter_check[2] = True
-
-			elif decoded.lower() == 'h':
-				self.match_length += len(char)
-				self.letter_check[3] = True
+			elif idx > 0:
+				self.match_length += 1
+				self.letters_found += 1
 
 			else:
-				if self.start_index != -1 and sum(self.letter_check) == 4:
+				if self.start_index != -1 and self.letters_found == 4:
 					if self.spaces:
 						self.match_length -= self.spaces
 
@@ -148,7 +141,7 @@ class GamerReplacer:
 					self.reset()
 
 				else:
-					if decoded in ascii_letters:
+					if decoded in ASCII_LETTERS:
 						self.reset()
 
 					else:
@@ -160,7 +153,7 @@ class GamerReplacer:
 						if self.start_index != -1:
 							self.match_length += len(char)
 
-			if self.start_index != -1 and sum(self.letter_check) == 4 and is_last_char:
+			if self.start_index != -1 and self.letters_found == 4 and is_last_char:
 				indexes.append((
 					self.match_length,
 					self.start_index,
@@ -169,22 +162,21 @@ class GamerReplacer:
 
 		indexes = sorted(indexes, key=lambda l: l[1])
 
-		seperated = list(self.text)
+		separated = list(self.text)
 		offset = 0
 		for length, start, end in indexes:
 			start += offset
 			end += offset - 1
 
 			replacement = random.choice(CATCHPHRASES)
-			seperated[start:end + 1] = replacement
+			separated[start:end + 1] = replacement
 
 			replaced_len = len(replacement)
 			offset += replaced_len - length
 
 		self.closed = True
 
-		return ''.join(seperated)
-
+		return ''.join(separated)
 
 class GamerWords(commands.Cog):
 	def __init__(self, bot):
