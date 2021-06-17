@@ -208,7 +208,7 @@ class GamerWords(commands.Cog):
 				except discord.HTTPException:
 					continue
 
-				for webhook in await channel.webhooks():
+				for webhook in webhooks:
 					if webhook.user == guild.me:
 						self.webhook_cache[guild][webhook.channel].append(webhook)
 
