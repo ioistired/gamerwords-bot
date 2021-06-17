@@ -54,6 +54,7 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 # THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import discord
 from bot_bin.bot import Bot
 
 class Bot(Bot):
@@ -62,6 +63,20 @@ class Bot(Bot):
 		'cogs.gamerwords',
 		'jishaku',
 	]
+	def __init__(self, *args, **kwargs):
+		super().__init__(
+			intents=discord.Intents(
+				# avatar/nickname caching
+				members=True,
+				guilds=True,
+				webhooks=True,
+				messages=True,
+				# needed for jishaku pagination
+				reactions=True,
+			),
+			*args,
+			**kwargs,
+		)
 
 def main():
 	import toml
