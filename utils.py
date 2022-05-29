@@ -53,11 +53,11 @@
 
 import asyncio
 
-async def gather_or_cancel(*awaitables, loop=None):
+async def gather_or_cancel(*awaitables):
     """run the awaitables in the sequence concurrently. If any of them raise an exception,
     propagate the first exception raised and cancel all other awaitables.
     """
-    gather_task = asyncio.gather(*awaitables, loop=loop)
+    gather_task = asyncio.gather(*awaitables)
     try:
         return await gather_task
     except asyncio.CancelledError:
