@@ -1,5 +1,5 @@
 discord.py ~= 1.7
 unidecode ~= 1.1
-pytomlpp ~= 1.0
+qtoml ~= 0.3.1
 bot-bin ~= 1.5
 jishaku ~= 2.0

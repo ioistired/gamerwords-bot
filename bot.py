@@ -79,7 +79,7 @@ class Bot(Bot):
 		)
 
 def main():
-	import toml
+	import qtoml as toml
 	with open('config.toml') as f:
 		bot = Bot(config=toml.load(f))
 	bot.run()
